@@ -8,11 +8,12 @@ from app.downloader_genesys.configs.reports_config import REPORTS_CONFIG
 from app.proxy_genesys.routers import analytics, users
 from app.proxy_genesys.services.dashboard_service import get_dashboard_data
 from app.proxy_genesys.routers import analytics, users, dashboard
+import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
-    start_scheduler()
+    if os.getenv("ENV") != "production":
+        start_scheduler()
     yield
 
 app = FastAPI(lifespan=lifespan)
