@@ -35,7 +35,7 @@ def normalize_user(entity):
 
 
 def evaluate_alerts(user):
-    alerts = []
+    best_alert = None
 
     for config in STATUS_CONFIG:
         if config["source"] == "presence":
@@ -45,7 +45,6 @@ def evaluate_alerts(user):
         elif config["source"] == "routing":
             status = user["routing"]["status"]
             time = user["routing"]["time"]
-
         else:
             continue
 
@@ -57,40 +56,29 @@ def evaluate_alerts(user):
         min_t = config.get("min_threshold", 0)
         max_t = config.get("max_threshold")
 
-        # ---------------------------
-        # 🔥 CASO 1: ventana (Offline)
-        # ---------------------------
+        level = None
+
         if config.get("visibility_only"):
             if min_t <= elapsed <= max_t:
-                alerts.append({
-                    "name": user["name"],
-                    "status": status,
-                    "status_name": config["status_name"],
-                    "source": config["source"],
-                    "elapsed": elapsed,
-                    "level": "info"  # o lo que quieras
-                })
-            continue
+                level = "info"
 
-        # ---------------------------
-        # 🔥 CASO 2: doble threshold
-        # ---------------------------
-        if max_t:
+        elif max_t:
             if elapsed >= max_t:
                 level = "critical"
             elif elapsed >= min_t:
                 level = "warning"
-            else:
-                continue  # no mostrar
 
         else:
-            # threshold simple
             if elapsed >= min_t:
                 level = "warning"
-            else:
-                continue
 
-        alerts.append({
+        if status == "Offline" and elapsed > 3600:
+            continue
+
+        if not level:
+            continue
+
+        alert = {
             "name": user["name"],
             "status": status,
             "status_name": config["status_name"],
@@ -98,9 +86,15 @@ def evaluate_alerts(user):
             "elapsed": elapsed,
             "threshold": min_t,
             "level": level
-        })
+        }
 
-    return alerts
+        # 🔥 PRIORIDAD
+        priority = {"critical": 3, "warning": 2, "info": 1}
+
+        if not best_alert or priority[level] > priority[best_alert["level"]]:
+            best_alert = alert
+
+    return [best_alert] if best_alert else []
 
 def compute_stats(users):
     total = len(users)

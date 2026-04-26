@@ -58,11 +58,26 @@ async def wait_for_export(export_id, timeout=1200, heavy=False):
     raise TimeoutError(f"Timeout export {export_id} - elapsed {elapsed}")
 
 # DOWNLOAD FROM LIST IN QUEUE
-async def create_export_list(contact_list_id):
-    url = f"{settings.GENESYS_BASE_URL}outbound/contactlists/{contact_list_id}/export"
+async def create_export_list(contact_list_id, name):
+    url = f"{settings.GENESYS_BASE_URL}/outbound/contactlists/{contact_list_id}/export"
 
-    res = await client.get(url, headers=settings.GENESYS_HEADERS)
-    return res.json()
+    res = await client.post(url, headers=settings.GENESYS_HEADERS)
+
+    if res.status_code == 200:
+        data = res.json()
+        print(f"📦 POST OK {name}: {data}")
+        return data
+
+    # 🔥 CASO CLAVE
+    if res.status_code == 400:
+        error = res.json()
+
+        if error.get("code") == "contact.list.export.in.progress":
+            print(f"⚠️ {name} export ya en progreso → reutilizando")
+            return {"in_progress": True}
+
+    print(f"❌ Error creando export {name}: {res.text}")
+    return None
     
 async def check_export_status_list(contact_list_id):
     url = f"{settings.GENESYS_BASE_URL}/outbound/contactlists/{contact_list_id}/export"
